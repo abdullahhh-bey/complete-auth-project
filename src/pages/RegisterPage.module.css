@@ -1,0 +1,33 @@
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.loginLink {
+    text-align: center;
+    margin-top: 1.5rem;
+    font-size: 0.9rem;
+    color: var(--color-muted-foreground);
+}
+
+.loginLink a {
+    color: var(--color-primary);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.loginLink a:hover {
+    text-decoration: underline;
+}
+
+.terms {
+    margin-top: -0.5rem;
+    align-items: flex-start;
+}
+
+.termsLabel {
+    font-size: 0.8rem;
+    color: var(--color-muted-foreground);
+    line-height: normal;
+}
