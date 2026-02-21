@@ -12,8 +12,10 @@ builder.Services.AddSwaggerGen();
 
 
 //Adding the connction string 
+var connectionString = builder.Configuration["ConnectionStrings:DefaultConnection"];
+
 builder.Services.AddDbContext<AuthDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(connectionString));
 
 
 var app = builder.Build();
