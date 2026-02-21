@@ -19,7 +19,6 @@
   <ItemGroup>
     <Folder Include="DTOs\" />
     <Folder Include="Controllers\" />
-    <Folder Include="Data\" />
     <Folder Include="Application\" />
   </ItemGroup>
 
