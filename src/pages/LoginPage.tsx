@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Checkbox } from '../components/ui/Checkbox';
+import { authApi } from '../api/auth';
 import styles from './LoginPage.module.css';
 import authLayoutStyles from '../layouts/AuthLayout.module.css';
 
@@ -39,19 +40,17 @@ export const LoginPage: React.FC = () => {
 
     const onSubmit = async (data: LoginSchema) => {
         try {
-            // Simulation of API call
-            await new Promise((resolve) => setTimeout(resolve, 1500));
+            const response = await authApi.login({
+                email: data.email,
+                password: data.password
+            });
 
-            // Mock successful login
-            if (data.email === 'user@example.com' && data.password === 'password') {
-                login('fake-jwt-token', { id: '1', email: data.email, name: 'Demo User' });
-                toast.success('Welcome back!');
-                navigate('/'); // Redirect to dashboard main page (not implemented yet)
-            } else {
-                throw new Error('Invalid email or password');
-            }
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Login failed');
+            // Assuming response has { message, token } from the backend Login endpoint
+            login(response.token, { id: 'unknown', email: data.email, name: 'User' }); // using placeholder info since it's not sent, can decode token later
+            toast.success('Welcome back!');
+            navigate('/');
+        } catch (error: any) {
+            toast.error(error.message || 'Login failed');
         }
     };
 

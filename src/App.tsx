@@ -31,7 +31,7 @@ const Dashboard = () => {
         <h2>Welcome, {user?.name || 'User'}!</h2>
         <p style={{ color: 'var(--color-muted-foreground)' }}>You are successfully authenticated.</p>
         <div style={{ marginTop: '1rem', padding: '1rem', background: 'var(--color-muted)', borderRadius: 'var(--radius-md)' }}>
-          <code>User ID: {user?.id}</code><br />
+          <code>User ID: {user?.name}</code><br />
           <code>Email: {user?.email}</code>
         </div>
       </div>

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
+import { authApi } from '../api/auth';
 import styles from './LoginPage.module.css'; // Reuse login styles
 import authLayoutStyles from '../layouts/AuthLayout.module.css';
 
@@ -27,11 +28,10 @@ export const ForgotPasswordPage: React.FC = () => {
 
     const onSubmit = async (data: ForgotPasswordSchema) => {
         try {
-            await new Promise((resolve) => setTimeout(resolve, 1500));
-            console.log('Reset requested for', data);
+            await authApi.forgotPassword({ email: data.email });
             toast.success('If an account exists, a reset email has been sent.');
-        } catch (error) {
-            toast.error('Failed to send request.');
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to send request.');
         }
     };
 

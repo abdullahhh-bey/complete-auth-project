@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
+import { authApi } from '../api/auth';
 import styles from './LoginPage.module.css'; // Reuse login styles
 import authLayoutStyles from '../layouts/AuthLayout.module.css';
 
@@ -24,13 +25,14 @@ export const ResetPasswordPage: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
+    const email = searchParams.get('email');
 
     useEffect(() => {
-        if (!token) {
+        if (!token || !email) {
             // In a real app, maybe redirect or show error
-            toast.error('Invalid or missing reset token.');
+            toast.error('Invalid or missing reset token/email.');
         }
-    }, [token]);
+    }, [token, email]);
 
     const {
         register,
@@ -41,14 +43,17 @@ export const ResetPasswordPage: React.FC = () => {
     });
 
     const onSubmit = async (data: ResetSchema) => {
-        if (!token) return;
+        if (!token || !email) return;
         try {
-            await new Promise((resolve) => setTimeout(resolve, 1500));
-            console.log('Resetting with token', token, data);
-            toast.success('Password reset successfully!');
+            await authApi.resetPassword({
+                email,
+                resetToken: token,
+                password: data.password
+            });
+            toast.success('Password reset successfully! Please login with your new password.');
             navigate('/login');
-        } catch (error) {
-            toast.error('Failed to reset password.');
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to reset password.');
         }
     };
 

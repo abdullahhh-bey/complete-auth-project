@@ -9,6 +9,7 @@ import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Checkbox } from '../components/ui/Checkbox';
 import { PasswordStrength } from '../components/auth/PasswordStrength';
+import { authApi } from '../api/auth';
 import styles from './RegisterPage.module.css';
 import authLayoutStyles from '../layouts/AuthLayout.module.css';
 
@@ -35,6 +36,7 @@ export const RegisterPage: React.FC = () => {
         register,
         handleSubmit,
         watch,
+        setError,
         formState: { errors, isSubmitting },
     } = useForm<RegisterSchema>({
         resolver: zodResolver(registerSchema),
@@ -60,13 +62,23 @@ export const RegisterPage: React.FC = () => {
 
     const onSubmit = async (data: RegisterSchema) => {
         try {
-            await new Promise((resolve) => setTimeout(resolve, 1500));
-            // Simulate API call
-            console.log('Registering', data);
+            await authApi.register({
+                fullName: data.fullName,
+                email: data.email,
+                password: data.password,
+                confirmPassword: data.confirmPassword
+            });
             toast.success('Account created successfully!');
             navigate('/login');
-        } catch (error) {
-            toast.error('Registration failed. Please try again.');
+        } catch (error: any) {
+            const errorMsg = error.message.toLowerCase();
+            if (errorMsg.includes('email already exists')) {
+                setError('email', { type: 'manual', message: 'Email already exists' });
+            } else if (errorMsg.includes('passwords do not match')) {
+                setError('confirmPassword', { type: 'manual', message: 'Passwords do not match' });
+            } else {
+                toast.error(error.message || 'Registration failed. Please try again.');
+            }
         }
     };
 

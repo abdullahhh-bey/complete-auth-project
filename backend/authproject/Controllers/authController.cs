@@ -119,11 +119,14 @@ namespace authproject.Controllers
             // In real project → send via EmailService
             //var resetLink = $"https://yourfrontend.com/reset-password?token={token}";
 
+            var resetLink = $"http://localhost:5173/reset-password?email={Uri.EscapeDataString(user.Email)}&token={Uri.EscapeDataString(token)}";
+
             var body = $@"
                 <h2>Password Reset</h2>
-                <p>Click the link below to reset your password:</p>
-                <p>Token : {token}</p>
-                <p>This token expires in 10 minutes.</p>
+                <p>Click the link below to set a new password:</p>
+                <p><a href='{resetLink}'>Reset Password</a></p>
+                <p>Or use this token: {token}</p>
+                <p>This link expires in 10 minutes.</p>
             ";
 
             await _emailService.SendEmailAsync(
