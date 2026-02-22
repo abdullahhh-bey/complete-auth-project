@@ -95,5 +95,61 @@ namespace authproject.Controllers
 
 
 
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword(ForgotPassDTO dto)
+        {
+            //Check if email is registered or not
+            var user = _context.Consumers.FirstOrDefault(x => x.Email == dto.Email);
+            if (user == null)
+            {
+                return Ok("If email exists, link will be sent to it.");
+            }
+
+            // Generate secure token
+            var token = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+
+            user.ResetToken = token;
+            user.ResetTokenExpiry = DateTime.UtcNow.AddMinutes(10);
+
+            await _context.SaveChangesAsync();
+
+            // In real project → send via EmailService
+            //var resetLink = $"https://yourfrontend.com/reset-password?token={token}";
+
+            var resetToken = token;
+
+            return Ok( new
+            {
+                token = resetToken,
+                message = "Use this link to reset password"
+            });
+        }
+
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword( ResetPassDTO dto)
+        {
+            //Checking if the token is present 
+            var user = _context.Consumers
+            .FirstOrDefault(x => x.ResetToken == dto.ResetToken);
+
+            if (user == null)
+                return BadRequest("Invalid token");
+
+            if (user.ResetTokenExpiry < DateTime.UtcNow)
+                return BadRequest("Token expired");
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+
+            //Once pasword changed, remove the previous token and expiry of previous token
+            user.ResetToken = null;
+            user.ResetTokenExpiry = null;
+
+            await _context.SaveChangesAsync();
+
+            return Ok("Password reset successful.");
+        }
+
+
     }
 }
