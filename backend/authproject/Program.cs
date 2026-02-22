@@ -1,3 +1,4 @@
+using authproject.Application.EmailService;
 using authproject.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,6 +11,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 
 //Adding the connction string 

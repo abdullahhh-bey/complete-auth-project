@@ -1,4 +1,5 @@
-﻿using authproject.Data;
+﻿using authproject.Application.EmailService;
+using authproject.Data;
 using authproject.DTOs;
 using authproject.Models;
 using Microsoft.AspNetCore.Http;
@@ -12,11 +13,13 @@ namespace authproject.Controllers
     {
         private readonly AuthDbContext _context;
         private readonly TokenService _tokenservice;
+        private readonly IEmailService _emailService;
 
-        public authController(AuthDbContext context, TokenService tokenservice)
+        public authController(AuthDbContext context, TokenService tokenservice, IEmailService emailService)
         {
             _context = context;
             _tokenservice = tokenservice;
+            _emailService = emailService;
         }   
 
 
@@ -107,7 +110,8 @@ namespace authproject.Controllers
 
             // Generate secure token
             var token = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-            user.ResetToken = BCrypt.Net.BCrypt.HashPassword(token);
+            var encrypttoken = BCrypt.Net.BCrypt.HashPassword(token);
+            user.ResetToken = encrypttoken;
             user.ResetTokenExpiry = DateTime.UtcNow.AddMinutes(10);
 
             await _context.SaveChangesAsync();
@@ -115,13 +119,22 @@ namespace authproject.Controllers
             // In real project → send via EmailService
             //var resetLink = $"https://yourfrontend.com/reset-password?token={token}";
 
-            var resetToken = token;
+            var body = $@"
+                <h2>Password Reset</h2>
+                <p>Click the link below to reset your password:</p>
+                <p>Token : {token}</p>
+                <p>This token expires in 10 minutes.</p>
+            ";
 
-            return Ok( new
-            {
-                token = token,
-                message = "Use this link to reset password"
-            });
+            await _emailService.SendEmailAsync(
+                user.Email,
+                "Reset Your Password",
+                body
+            );
+
+            Console.WriteLine("Email Sent");
+
+            return Ok("Reset link sent to email.");
         }
 
 
