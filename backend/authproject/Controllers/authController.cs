@@ -107,8 +107,7 @@ namespace authproject.Controllers
 
             // Generate secure token
             var token = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-
-            user.ResetToken = token;
+            user.ResetToken = BCrypt.Net.BCrypt.HashPassword(token);
             user.ResetTokenExpiry = DateTime.UtcNow.AddMinutes(10);
 
             await _context.SaveChangesAsync();
@@ -131,9 +130,14 @@ namespace authproject.Controllers
         {
             //Checking if the token is present 
             var user = _context.Consumers
-            .FirstOrDefault(x => x.ResetToken == dto.ResetToken);
+            .FirstOrDefault(x => x.Email == dto.Email);
 
             if (user == null)
+                return BadRequest("No user registered");
+
+            //Check user and do the token checkup with encryption
+            var checkUser = BCrypt.Net.BCrypt.Verify(dto.ResetToken, user.ResetToken);
+            if (checkUser == false)
                 return BadRequest("Invalid token");
 
             if (user.ResetTokenExpiry < DateTime.UtcNow)
