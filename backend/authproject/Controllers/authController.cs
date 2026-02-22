@@ -119,10 +119,11 @@ namespace authproject.Controllers
 
             return Ok( new
             {
-                token = resetToken,
+                token = token,
                 message = "Use this link to reset password"
             });
         }
+
 
 
         [HttpPost("reset-password")]
