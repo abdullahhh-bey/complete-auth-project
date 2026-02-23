@@ -1,0 +1,47 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Chat App</title>
+    <link rel="stylesheet" href="css/chat.css">
+</head>
+<body>
+    <div class="chat-container">
+        <!-- Chat Header -->
+        <div class="chat-header">
+            <h1>💬 Real-Time Chat</h1>
+            <span id="status">Disconnected</span>
+        </div>
+
+        <!-- Messages Area -->
+        <div class="messages-container">
+            <ul id="messagesList">
+                <!-- Messages will appear here dynamically -->
+            </ul>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-container">
+            <input type="text"
+                   id="userInput"
+                   placeholder="Enter your name"
+                   maxlength="20" />
+
+            <input type="text"
+                   id="messageInput"
+                   placeholder="Type a message..."
+                   maxlength="500" />
+
+            <button id="sendButton">Send</button>
+        </div>
+    </div>
+
+    <!-- SignalR Client Library from CDN -->
+    <!-- This is the JavaScript library that handles SignalR communication -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+
+    <!-- Our custom chat logic -->
+    <script src="js/chat.js"></script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 using authproject.Application.EmailService;
 using authproject.Data;
 using Microsoft.EntityFrameworkCore;
+using authproject.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +11,7 @@ builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddSignalR(); //Added the SignalR service in IOC container
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 
@@ -46,5 +48,10 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Clients will connect to: https://authproject.com/chathub
+// Think of this like MapControllers() but for SignalR Hubs
+// The route "/chathub" is what clients use to connect
+app.MapHub<ChatHub>("/chathub");
 
 app.Run();

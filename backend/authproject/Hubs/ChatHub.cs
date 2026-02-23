@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNet.SignalR;
+﻿using System;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR;
 
 namespace authproject.Hubs
 {
@@ -19,7 +21,7 @@ namespace authproject.Hubs
             await Clients.All.SendAsync("ReceiveMessage", user, message);
         }
 
-        public override async Task OnConnected()
+        public override async Task OnConnectedAsync()
         {
             // Context.ConnectionId is a unique ID for this connection
             // Something like: "x8s9d7f6-3h2j-4k5l-9m8n-7b6v5c4x3z2a"
@@ -27,19 +29,16 @@ namespace authproject.Hubs
 
             // ALWAYS call the base method
             // This ensures SignalR's internal tracking works
-            await base.OnConnected();
+            await base.OnConnectedAsync();
         }
 
         // Optional: Track when users disconnect
-        public override async Task OnDisconnected(bool stopCalled)
+        public override async Task OnDisconnectedAsync(Exception? exception)
         {
             Console.WriteLine($"Client disconnected: {Context.ConnectionId}");
 
-            // stopCalled is true if disconnect was requested by client, false if due to error
-            await base.OnDisconnected(stopCalled);
+            // exception is non-null when the disconnect was due to an error
+            await base.OnDisconnectedAsync(exception);
         }
-
-
     }
-
 }
