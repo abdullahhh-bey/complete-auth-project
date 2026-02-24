@@ -19,6 +19,39 @@ function getAuthToken() {
         sessionStorage.getItem('token');
 }
 
+// Simple JWT decoder to get current user details
+function parseJwt(token) {
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function (c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+
+        return JSON.parse(jsonPayload);
+    } catch (e) {
+        return null;
+    }
+}
+
+// Generate a color from string (for user avatars)
+function stringToColor(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = hash % 360;
+    // Return a nice pastel/material color
+    return `hsl(${hue}, 70%, 45%)`;
+}
+
+function getInitials(name) {
+    if (!name) return "?";
+    const parts = name.split(" ");
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.substring(0, 2).toUpperCase();
+}
+
 // ════════════════════════════════════════════════════════════════
 // ENFORCE AUTHENTICATION IMMEDIATELY
 // ════════════════════════════════════════════════════════════════
@@ -28,6 +61,12 @@ if (!token) {
     console.warn("No authentication token found. Redirecting to login...");
     window.location.href = "http://localhost:5173/login"; // Redirect back to Vite frontend
 }
+
+// Decode token to find current user
+const currentUserClaims = parseJwt(token);
+// Depending on backend claims, it might be unique_name, name, or Email.
+const currentUserName = currentUserClaims?.name || currentUserClaims?.unique_name || currentUserClaims?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] || "Current User";
+const currentUserEmail = currentUserClaims?.email || currentUserClaims?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"] || "";
 
 // ════════════════════════════════════════════════════════════════
 // CREATE SIGNALR CONNECTION
@@ -60,6 +99,22 @@ document.addEventListener("DOMContentLoaded", () => {
     messagesList = document.getElementById("messagesList");
     statusSpan = document.getElementById("status");
     currentUserSpan = document.getElementById("currentUser");
+    const logoutButton = document.getElementById("logoutButton");
+
+    // Set Header
+    if (currentUserSpan) {
+        currentUserSpan.textContent = currentUserName;
+    }
+
+    if (logoutButton) {
+        logoutButton.addEventListener("click", () => {
+            // Delete cookies
+            document.cookie = "authToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            localStorage.clear();
+            sessionStorage.clear();
+            window.location.href = "http://localhost:5173/login";
+        });
+    }
     onlineUsersList = document.getElementById("onlineUsersList") || document.getElementById("onlineuserslist"); // fallback for casing
     onlineCount = document.getElementById("onlineCount");
     typingIndicator = document.getElementById("typingIndicator");
@@ -73,25 +128,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function setupSignalREvents() {
     connection.on("receivemessage", function (fullName, email, message) {
-        const li = document.createElement("li");
+        const isSentByMe = (fullName === currentUserName || email === currentUserEmail);
 
-        const senderSpan = document.createElement("span");
-        senderSpan.className = "message-sender";
-        senderSpan.textContent = fullName;
+        const rowDiv = document.createElement("div");
+        rowDiv.className = `message-row ${isSentByMe ? 'sent' : 'received'}`;
 
-        const emailSpan = document.createElement("span");
-        emailSpan.className = "message-email";
-        emailSpan.textContent = `(${email})`;
+        const bubbleDiv = document.createElement("div");
+        bubbleDiv.className = "message-bubble";
 
-        const messageSpan = document.createElement("span");
-        messageSpan.className = "message-text";
-        messageSpan.textContent = `: ${message}`;
+        if (!isSentByMe) {
+            const senderDiv = document.createElement("div");
+            senderDiv.className = "message-sender-name";
+            senderDiv.textContent = fullName;
+            senderDiv.style.color = stringToColor(fullName);
+            bubbleDiv.appendChild(senderDiv);
+        }
 
-        li.appendChild(senderSpan);
-        li.appendChild(emailSpan);
-        li.appendChild(messageSpan);
+        const textDiv = document.createElement("div");
+        textDiv.className = "message-text";
+        textDiv.textContent = message;
+        bubbleDiv.appendChild(textDiv);
 
-        messagesList.appendChild(li);
+        rowDiv.appendChild(bubbleDiv);
+        messagesList.appendChild(rowDiv);
+
         scrollToBottom();
     });
 
@@ -125,19 +185,27 @@ function setupSignalREvents() {
         users.forEach(user => {
             const li = document.createElement("li");
 
+            const avatarDiv = document.createElement("div");
+            avatarDiv.className = "user-avatar";
+            avatarDiv.style.backgroundColor = stringToColor(user.FullName);
+            avatarDiv.textContent = getInitials(user.FullName);
+
+            const infoDiv = document.createElement("div");
+            infoDiv.className = "user-info";
+
             const nameDiv = document.createElement("div");
             nameDiv.className = "user-name";
             nameDiv.textContent = user.FullName;
 
-            const emailDiv = document.createElement("div");
-            emailDiv.className = "user-email";
-            emailDiv.textContent = user.Email;
+            const statusDiv = document.createElement("div");
+            statusDiv.className = "user-status";
+            statusDiv.textContent = "online";
 
-            li.appendChild(nameDiv);
-            li.appendChild(emailDiv);
+            infoDiv.appendChild(nameDiv);
+            infoDiv.appendChild(statusDiv);
 
-            const connectedTime = new Date(user.ConnectedAt);
-            li.title = `Connected at ${connectedTime.toLocaleTimeString()}`;
+            li.appendChild(avatarDiv);
+            li.appendChild(infoDiv);
 
             onlineUsersList.appendChild(li);
         });
@@ -233,10 +301,16 @@ function startConnection() {
             console.log("✅ Connected to SignalR hub");
             console.log("Connection ID:", connection.connectionId);
 
-            updateStatus("Connected ✅", "rgba(76, 175, 80, 0.8)");
-            if (sendButton) sendButton.disabled = false;
+            // Re-render user info securely checking DOM once more
+            if (currentUserSpan) {
+                currentUserSpan.textContent = currentUserName || "Connected";
+            }
 
-            if (currentUserSpan) currentUserSpan.textContent = "Connected as authenticated user";
+            updateStatus("Online", "transparent");
+            const stat = document.getElementById("status");
+            if (stat) stat.classList.add("connected");
+
+            if (sendButton) sendButton.disabled = false;
         })
         .catch(function (err) {
             console.error("❌ Connection error:", err.toString());

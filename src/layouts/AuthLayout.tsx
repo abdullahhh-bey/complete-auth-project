@@ -17,15 +17,18 @@ export const AuthLayout: React.FC = () => {
             <AnimatePresence mode="wait">
                 <motion.div
                     key={location.pathname}
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -15 }}
-                    transition={{ duration: 0.25 }}
+                    initial={{ opacity: 0, scale: 0.96, y: 15 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96, y: -15 }}
+                    transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
                     className={styles.card}
                 >
                     <div className={styles.header}>
-                        <div className={styles.logo}>
-                            <ShieldCheck size={28} />
+                        <div className={styles.logoWrapper}>
+                            <div className={styles.logoIcon}>
+                                <ShieldCheck size={32} />
+                            </div>
+                            <h2 className={styles.brandName}>SecureLocks</h2>
                         </div>
                     </div>
                     <Outlet />

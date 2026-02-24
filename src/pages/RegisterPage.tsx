@@ -94,7 +94,7 @@ export const RegisterPage: React.FC = () => {
             <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
                 <Input
                     label="Full Name"
-                    placeholder="John Doe"
+                    placeholder="John Cena"
                     error={errors.fullName?.message}
                     {...register('fullName')}
                 />

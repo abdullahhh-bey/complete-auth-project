@@ -59,10 +59,6 @@ export const LoginPage: React.FC = () => {
     return (
         <>
             <div className={authLayoutStyles.header}>
-                <div className={authLayoutStyles.logo}>
-                    {/* Logo Icon is in Layout, but we can repeat or customize header here if needed. 
-                Layout handles the icon. We just add title. */}
-                </div>
                 <h1 className={authLayoutStyles.title}>Welcome back</h1>
                 <p className={authLayoutStyles.subtitle}>
                     Sign in to your account
