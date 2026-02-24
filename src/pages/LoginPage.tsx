@@ -48,7 +48,9 @@ export const LoginPage: React.FC = () => {
             // Assuming response has { message, token } from the backend Login endpoint
             login(response.token, { id: 'unknown', email: data.email, name: 'User' }); // using placeholder info since it's not sent, can decode token later
             toast.success('Welcome back!');
-            navigate('/');
+
+            // Redirect to backend chat interface across the port
+            window.location.href = 'http://localhost:5034/index.html';
         } catch (error: any) {
             toast.error(error.message || 'Login failed');
         }
