@@ -10,35 +10,52 @@
     <div class="chat-container">
         <!-- Chat Header -->
         <div class="chat-header">
-            <h1>💬 Real-Time Chat</h1>
+            <div>
+                <h1>💬 Real-Time Chat</h1>
+                <!-- Show logged-in user info -->
+                <small id="currentUser">Loading...</small>
+            </div>
             <span id="status">Disconnected</span>
         </div>
 
-        <!-- Messages Area -->
-        <div class="messages-container">
-            <ul id="messagesList">
-                <!-- Messages will appear here dynamically -->
-            </ul>
-        </div>
+        <!-- Main Chat Body -->
+        <div class="chat-body">
+            <!-- Sidebar: Online Users -->
+            <div class="online-users-sidebar">
+                <h3>🟢 Online (<span id="onlineCount">0</span>)</h3>
+                <ul id="onlineUsersList">
+                    <!-- Dynamically populated -->
+                </ul>
+            </div>
 
-        <!-- Input Area -->
-        <div class="input-container">
-            <input type="text"
-                   id="userInput"
-                   placeholder="Enter your name"
-                   maxlength="20" />
+            <!-- Main Messages Section -->
+            <div class="messages-section">
+                <!-- Messages Container -->
+                <div class="messages-container">
+                    <ul id="messagesList">
+                        <!-- Messages appear here -->
+                    </ul>
+                </div>
 
-            <input type="text"
-                   id="messageInput"
-                   placeholder="Type a message..."
-                   maxlength="500" />
+                <!-- Typing Indicator -->
+                <div id="typingIndicator" class="typing-indicator">
+                    <em id="typingText"></em>
+                </div>
 
-            <button id="sendButton">Send</button>
+                <!-- Input Area -->
+                <div class="input-container">
+                    <input type="text"
+                           id="messageInput"
+                           placeholder="Type a message..."
+                           maxlength="500" />
+
+                    <button id="sendButton" disabled>Send</button>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- SignalR Client Library from CDN -->
-    <!-- This is the JavaScript library that handles SignalR communication -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
 
     <!-- Our custom chat logic -->

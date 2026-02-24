@@ -1,184 +1,302 @@
-﻿// ========================================
-// STEP 1: CREATE SIGNALR CONNECTION
-// ========================================
+﻿// ════════════════════════════════════════════════════════════════
+// HELPER: GET JWT TOKEN
+// ════════════════════════════════════════════════════════════════
 
-// signalR is available globally from the CDN script we included
-// HubConnectionBuilder is a class that helps us create a connection
+function getAuthToken() {
+    // Adjust the key name to match where you store the token
+    // Common names: 'authToken', 'jwtToken', 'token', 'access_token'
+    return localStorage.getItem('authToken') ||
+        sessionStorage.getItem('authToken') ||
+        localStorage.getItem('token') ||
+        sessionStorage.getItem('token');
+}
+
+// ════════════════════════════════════════════════════════════════
+// CREATE SIGNALR CONNECTION
+// ════════════════════════════════════════════════════════════════
+
 const connection = new signalR.HubConnectionBuilder()
-    // .withUrl() tells SignalR WHERE to connect
-    // "/chathub" matches the route we defined in Program.cs: app.MapHub<ChatHub>("/chathub")
-    .withUrl("/chathub")
+    .withUrl("/chathub", {
+        // JWT token is passed here
+        accessTokenFactory: () => {
+            const token = getAuthToken();
 
-    // .configureLogging() sets up logging level
-    // LogLevel.Information shows connection info, errors, etc.
-    // Other options: LogLevel.Debug, LogLevel.Error, LogLevel.None
+            if (!token) {
+                console.error("❌ No authentication token found!");
+                console.log("Please log in first");
+            }
+
+            return token || "";
+        }
+    })
     .configureLogging(signalR.LogLevel.Information)
-
-    // .build() creates the actual connection object
+    .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
     .build();
 
-// At this point, connection is created but NOT connected yet
-// Think of it like: you've written a phone number, but haven't dialed yet
+// ════════════════════════════════════════════════════════════════
+// DOM ELEMENTS
+// ════════════════════════════════════════════════════════════════
 
-// ========================================
-// STEP 2: SET UP EVENT LISTENER
-// ========================================
+const sendButton = document.getElementById("sendButton");
+const messageInput = document.getElementById("messageInput");
+const messagesList = document.getElementById("messagesList");
+const statusSpan = document.getElementById("status");
+const currentUserSpan = document.getElementById("currentUser");
+const onlineUsersList = document.getElementById("onlineUsersList");
+const onlineCount = document.getElementById("onlineCount");
+const typingIndicator = document.getElementById("typingIndicator");
+const typingText = document.getElementById("typingText");
 
-// connection.on() is how we LISTEN for events from the server
-// "ReceiveMessage" MUST match the event name in ChatHub.cs
-// Remember: await Clients.All.SendAsync("ReceiveMessage", user, message);
-connection.on("ReceiveMessage", function (user, message) {
-    // This function runs EVERY TIME the server sends a "ReceiveMessage" event
+// ════════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════════
 
-    // user and message are the parameters sent from the server
-    // They match the parameters in: SendAsync("ReceiveMessage", user, message)
+let typingTimeout = null;
+let currentlyTypingUsers = new Set();
 
-    // Create a new <li> element for the message
+// ════════════════════════════════════════════════════════════════
+// EVENT LISTENERS FROM SERVER
+// ════════════════════════════════════════════════════════════════
+
+connection.on("ReceiveMessage", function (fullName, email, message) {
     const li = document.createElement("li");
 
-    // Set the innerHTML with the user and message
-    // We use textContent for the actual text to prevent XSS attacks
-    // (textContent escapes HTML, so <script> tags won't execute)
-    const userSpan = document.createElement("strong");
-    userSpan.textContent = user;
+    const senderSpan = document.createElement("span");
+    senderSpan.className = "message-sender";
+    senderSpan.textContent = fullName;
 
-    const messageText = document.createTextNode(": " + message);
+    const emailSpan = document.createElement("span");
+    emailSpan.className = "message-email";
+    emailSpan.textContent = `(${email})`;
 
-    li.appendChild(userSpan);
-    li.appendChild(messageText);
+    const messageSpan = document.createElement("span");
+    messageSpan.className = "message-text";
+    messageSpan.textContent = `: ${message}`;
 
-    // Add the message to the messages list
-    document.getElementById("messagesList").appendChild(li);
+    li.appendChild(senderSpan);
+    li.appendChild(emailSpan);
+    li.appendChild(messageSpan);
 
-    // Auto-scroll to the bottom to show the latest message
-    const messagesContainer = document.querySelector(".messages-container");
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    messagesList.appendChild(li);
+    scrollToBottom();
 });
 
-// ========================================
-// STEP 3: START THE CONNECTION
-// ========================================
+connection.on("UserConnected", function (fullName, email) {
+    console.log(`✅ ${fullName} (${email}) joined`);
 
-// connection.start() actually connects to the server
-// It's asynchronous, so we use .then() and .catch()
+    const li = document.createElement("li");
+    li.className = "system-message";
+    li.textContent = `${fullName} joined the chat`;
+    messagesList.appendChild(li);
+
+    connection.invoke("GetOnlineUsers").catch(err => console.error(err));
+});
+
+connection.on("UserDisconnected", function (fullName, email) {
+    console.log(`❌ ${fullName} (${email}) left`);
+
+    const li = document.createElement("li");
+    li.className = "system-message";
+    li.textContent = `${fullName} left the chat`;
+    messagesList.appendChild(li);
+
+    connection.invoke("GetOnlineUsers").catch(err => console.error(err));
+});
+
+connection.on("OnlineUsersList", function (users) {
+    onlineUsersList.innerHTML = "";
+    onlineCount.textContent = users.length;
+
+    users.forEach(user => {
+        const li = document.createElement("li");
+
+        const nameDiv = document.createElement("div");
+        nameDiv.className = "user-name";
+        nameDiv.textContent = user.FullName;
+
+        const emailDiv = document.createElement("div");
+        emailDiv.className = "user-email";
+        emailDiv.textContent = user.Email;
+
+        li.appendChild(nameDiv);
+        li.appendChild(emailDiv);
+
+        const connectedTime = new Date(user.ConnectedAt);
+        li.title = `Connected at ${connectedTime.toLocaleTimeString()}`;
+
+        onlineUsersList.appendChild(li);
+    });
+});
+
+connection.on("UserTyping", function (fullName) {
+    currentlyTypingUsers.add(fullName);
+    updateTypingIndicator();
+});
+
+connection.on("UserStoppedTyping", function (fullName) {
+    currentlyTypingUsers.delete(fullName);
+    updateTypingIndicator();
+});
+
+// ════════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS
+// ════════════════════════════════════════════════════════════════
+
+function updateTypingIndicator() {
+    if (currentlyTypingUsers.size === 0) {
+        typingIndicator.classList.remove("visible");
+        typingIndicator.style.display = "none";
+    } else {
+        typingIndicator.classList.add("visible");
+        typingIndicator.style.display = "block";
+
+        const users = Array.from(currentlyTypingUsers);
+        if (users.length === 1) {
+            typingText.textContent = `${users[0]} is typing...`;
+        } else if (users.length === 2) {
+            typingText.textContent = `${users[0]} and ${users[1]} are typing...`;
+        } else {
+            typingText.textContent = `${users.length} people are typing...`;
+        }
+    }
+}
+
+function scrollToBottom() {
+    const messagesContainer = document.querySelector(".messages-container");
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function updateStatus(message, color) {
+    statusSpan.textContent = message;
+    statusSpan.style.background = color;
+}
+
+// ════════════════════════════════════════════════════════════════
+// CONNECTION MANAGEMENT
+// ════════════════════════════════════════════════════════════════
+
 connection.start()
     .then(function () {
-        // SUCCESS! Connection established
         console.log("✅ Connected to SignalR hub");
+        console.log("Connection ID:", connection.connectionId);
 
-        // Update the status indicator
-        document.getElementById("status").textContent = "Connected ✅";
-        document.getElementById("status").style.background = "rgba(76, 175, 80, 0.8)";
+        updateStatus("Connected ✅", "rgba(76, 175, 80, 0.8)");
+        sendButton.disabled = false;
 
-        // Enable the send button
-        document.getElementById("sendButton").disabled = false;
+        currentUserSpan.textContent = "Connected as authenticated user";
     })
     .catch(function (err) {
-        // ERROR! Connection failed
         console.error("❌ Connection error:", err.toString());
+        updateStatus("Connection Failed ❌", "rgba(244, 67, 54, 0.8)");
+        sendButton.disabled = true;
 
-        // Update the status indicator
-        document.getElementById("status").textContent = "Connection Failed ❌";
-        document.getElementById("status").style.background = "rgba(244, 67, 54, 0.8)";
+        // Check if it's an authentication error
+        if (err.toString().includes("401") ||
+            err.toString().includes("Unauthorized") ||
+            err.toString().includes("Failed to complete negotiation")) {
 
-        // Keep send button disabled
-        document.getElementById("sendButton").disabled = true;
+            alert("❌ Authentication Error\n\nYou must be logged in to use chat.\n\nPlease log in and try again.");
+
+            // Optional: Redirect to login page
+            // window.location.href = "/login";
+        }
     });
 
-// ========================================
-// STEP 4: SEND MESSAGES
-// ========================================
+connection.onreconnecting(error => {
+    console.log("🔄 Connection lost. Reconnecting...", error);
+    updateStatus("Reconnecting...", "rgba(255, 152, 0, 0.8)");
+    sendButton.disabled = true;
+});
 
-// Get references to our HTML elements
-const sendButton = document.getElementById("sendButton");
-const userInput = document.getElementById("userInput");
-const messageInput = document.getElementById("messageInput");
+connection.onreconnected(connectionId => {
+    console.log("✅ Reconnected! New connection ID:", connectionId);
+    updateStatus("Connected ✅", "rgba(76, 175, 80, 0.8)");
+    sendButton.disabled = false;
 
-// Disable send button until we're connected
-sendButton.disabled = true;
+    connection.invoke("GetOnlineUsers").catch(err => console.error(err));
 
-// Handle send button click
+    const li = document.createElement("li");
+    li.className = "system-message";
+    li.textContent = "Reconnected to chat";
+    messagesList.appendChild(li);
+    scrollToBottom();
+});
+
+connection.onclose(error => {
+    console.log("🔌 Connection closed", error);
+    updateStatus("Disconnected ❌", "rgba(244, 67, 54, 0.8)");
+    sendButton.disabled = true;
+
+    if (error) {
+        console.error("Close reason:", error);
+    }
+});
+
+// ════════════════════════════════════════════════════════════════
+// SEND MESSAGE
+// ════════════════════════════════════════════════════════════════
+
 sendButton.addEventListener("click", function (event) {
-    // Get the values from inputs
-    const user = userInput.value.trim();  // .trim() removes whitespace
     const message = messageInput.value.trim();
 
-    // Validation: Make sure both fields have content
-    if (user === "" || message === "") {
-        alert("Please enter both your name and a message!");
-        return;  // Stop here, don't send
+    if (message === "") {
+        return;
     }
 
-    // connection.invoke() calls a method on the server Hub
-    // "SendMessage" MUST match the method name in ChatHub.cs
-    // Remember: public async Task SendMessage(string user, string message)
-    connection.invoke("SendMessage", user, message)
+    sendButton.disabled = true;
+
+    connection.invoke("SendMessage", message)
         .then(function () {
-            // SUCCESS! Message sent to server
             console.log("✅ Message sent");
-
-            // Clear the message input (but keep the username)
             messageInput.value = "";
-
-            // Focus back on message input for quick typing
+            sendButton.disabled = false;
             messageInput.focus();
+            connection.invoke("StopTypingIndicator");
         })
         .catch(function (err) {
-            // ERROR! Failed to send message
             console.error("❌ Send error:", err.toString());
             alert("Failed to send message. Please try again.");
+            sendButton.disabled = false;
         });
 
-    // Prevent form submission if this was in a form
     event.preventDefault();
 });
 
-// ========================================
-// STEP 5: HANDLE ENTER KEY
-// ========================================
-
-// Allow sending messages by pressing Enter
 messageInput.addEventListener("keypress", function (event) {
-    // event.key is the key that was pressed
-    // Check if it's the Enter key
     if (event.key === "Enter") {
-        // Trigger the send button click
         sendButton.click();
-
-        // Prevent default behavior (like form submission)
         event.preventDefault();
     }
 });
 
-// ========================================
-// STEP 6: HANDLE DISCONNECTION
-// ========================================
+// ════════════════════════════════════════════════════════════════
+// TYPING INDICATORS
+// ════════════════════════════════════════════════════════════════
 
-// This event fires when the connection is lost
-connection.onclose(function (err) {
-    console.log("🔌 Connection closed");
-
-    // Update UI
-    document.getElementById("status").textContent = "Disconnected ❌";
-    document.getElementById("status").style.background = "rgba(244, 67, 54, 0.8)";
-    sendButton.disabled = true;
-
-    if (err) {
-        console.error("Disconnect reason:", err);
+messageInput.addEventListener("input", function () {
+    if (typingTimeout) {
+        clearTimeout(typingTimeout);
     }
 
-    // Optional: Attempt to reconnect after 5 seconds
-    setTimeout(function () {
-        console.log("🔄 Attempting to reconnect...");
-        connection.start()
-            .then(function () {
-                console.log("✅ Reconnected!");
-                document.getElementById("status").textContent = "Connected ✅";
-                document.getElementById("status").style.background = "rgba(76, 175, 80, 0.8)";
-                sendButton.disabled = false;
-            })
-            .catch(function (err) {
-                console.error("❌ Reconnection failed:", err);
-            });
-    }, 5000);  // 5000 milliseconds = 5 seconds
+    if (messageInput.value.trim() !== "") {
+        connection.invoke("SendTypingIndicator")
+            .catch(err => console.error("Typing indicator error:", err));
+
+        typingTimeout = setTimeout(() => {
+            connection.invoke("StopTypingIndicator")
+                .catch(err => console.error("Stop typing error:", err));
+        }, 2000);
+    } else {
+        connection.invoke("StopTypingIndicator")
+            .catch(err => console.error("Stop typing error:", err));
+    }
+});
+
+messageInput.addEventListener("blur", function () {
+    connection.invoke("StopTypingIndicator")
+        .catch(err => console.error("Stop typing error:", err));
+
+    if (typingTimeout) {
+        clearTimeout(typingTimeout);
+    }
 });

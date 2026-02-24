@@ -1,7 +1,11 @@
+﻿using authproject.Application;
 using authproject.Application.EmailService;
 using authproject.Data;
-using Microsoft.EntityFrameworkCore;
 using authproject.Hubs;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +18,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR(); //Added the SignalR service in IOC container
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddSingleton<ConnectionManager>();
 
 
 //Adding the connction string 
@@ -31,6 +36,56 @@ builder.Services.AddCors(options =>
                .AllowAnyHeader();
     });
 });
+
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        // Standard JWT validation for HTTP requests
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["JWT:Issuer"],
+            ValidAudience = builder.Configuration["JWT:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(builder.Configuration["JWT:Secret"])
+            )
+        };
+
+        // ═══════════════════════════════════════════════════════════
+        // SIGNALR-SPECIFIC JWT CONFIGURATION
+        // ═══════════════════════════════════════════════════════════
+
+        // SignalR sends the token in a QUERY STRING (not header)
+        // We need to extract it and validate it
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                // Get the access token from query string
+                // SignalR client will send: /chathub?access_token=YOUR_JWT_TOKEN
+                var accessToken = context.Request.Query["access_token"];
+
+                // Get the path that was requested
+                var path = context.HttpContext.Request.Path;
+
+                // If the request is for our SignalR hub AND token exists
+                if (!string.IsNullOrEmpty(accessToken) &&
+                    path.StartsWithSegments("/chathub"))
+                {
+                    // Set the token so JWT middleware can validate it
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            }
+        };
+    });
+
+
 
 var app = builder.Build();
 
