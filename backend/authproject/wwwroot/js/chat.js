@@ -66,12 +66,13 @@ document.addEventListener("DOMContentLoaded", () => {
     typingText = document.getElementById("typingText");
 
     // Now start the connection since DOM is ready
+    setupSignalREvents();
     startConnection();
     setupEventListeners();
 });
 
 function setupSignalREvents() {
-    connection.on("ReceiveMessage", function (fullName, email, message) {
+    connection.on("receivemessage", function (fullName, email, message) {
         const li = document.createElement("li");
 
         const senderSpan = document.createElement("span");
@@ -94,7 +95,7 @@ function setupSignalREvents() {
         scrollToBottom();
     });
 
-    connection.on("UserConnected", function (fullName, email) {
+    connection.on("userconnected", function (fullName, email) {
         console.log(`✅ ${fullName} (${email}) joined`);
 
         const li = document.createElement("li");
@@ -105,7 +106,7 @@ function setupSignalREvents() {
         connection.invoke("GetOnlineUsers").catch(err => console.error(err));
     });
 
-    connection.on("UserDisconnected", function (fullName, email) {
+    connection.on("userdisconnected", function (fullName, email) {
         console.log(`❌ ${fullName} (${email}) left`);
 
         const li = document.createElement("li");
@@ -116,7 +117,7 @@ function setupSignalREvents() {
         connection.invoke("GetOnlineUsers").catch(err => console.error(err));
     });
 
-    connection.on("OnlineUsersList", function (users) {
+    connection.on("onlineuserslist", function (users) {
         if (!onlineUsersList) return;
         onlineUsersList.innerHTML = "";
         onlineCount.textContent = users.length;
@@ -142,12 +143,12 @@ function setupSignalREvents() {
         });
     });
 
-    connection.on("UserTyping", function (fullName) {
+    connection.on("usertyping", function (fullName) {
         currentlyTypingUsers.add(fullName);
         updateTypingIndicator();
     });
 
-    connection.on("UserStoppedTyping", function (fullName) {
+    connection.on("userstoppedtyping", function (fullName) {
         currentlyTypingUsers.delete(fullName);
         updateTypingIndicator();
     });
