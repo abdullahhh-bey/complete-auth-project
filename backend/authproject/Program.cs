@@ -49,6 +49,11 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+app.UseStaticFiles();
+// Allow index.html to be served at root URL
+app.UseDefaultFiles();
+
+
 // Clients will connect to: https://authproject.com/chathub
 // Think of this like MapControllers() but for SignalR Hubs
 // The route "/chathub" is what clients use to connect
