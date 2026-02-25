@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using authproject.Application;
+using authproject.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
@@ -11,12 +12,14 @@ namespace authproject.Hubs
     {
         // Dependency injection - get ConnectionManager from DI container
         private readonly ConnectionManager _connectionManager;
+        private readonly AuthDbContext _dbContext;
 
         // Constructor
         // ASP.NET Core automatically injects the ConnectionManager instance
-        public ChatHub(ConnectionManager connectionManager)
+        public ChatHub(ConnectionManager connectionManager, AuthDbContext dbContext)
         {
             _connectionManager = connectionManager;
+            _dbContext = dbContext;
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -119,7 +122,27 @@ namespace authproject.Hubs
             Console.WriteLine($"   Unique users online: {_connectionManager.GetOnlineUserCount()}");
 
             // ─────────────────────────────────────────────────────────
-            // STEP 8: Call Base Method (REQUIRED)
+            // STEP 8: Fetch Chat History
+            // ─────────────────────────────────────────────────────────
+
+            // Fetch the last 50 messages from the database
+            var chatHistory = _dbContext.Messages
+                .OrderByDescending(m => m.SentAt)
+                .Take(50)
+                .OrderBy(m => m.SentAt) // Re-order them chronologically 
+                .Select(m => new {
+                    fullName = m.SenderFullName,
+                    email = m.SenderEmail,
+                    content = m.Content,
+                    sentAt = m.SentAt
+                })
+                .ToList();
+
+            // Send the history ONLY to the specific user who just connected
+            await Clients.Caller.SendAsync("LoadChatHistory", chatHistory);
+
+            // ─────────────────────────────────────────────────────────
+            // STEP 9: Call Base Method (REQUIRED)
             // ─────────────────────────────────────────────────────────
 
             // ALWAYS call this - SignalR needs to do internal bookkeeping
@@ -197,6 +220,20 @@ namespace authproject.Hubs
             // Get user info from connection
             var fullName = connection.FullName;
             var email = connection.Email;
+
+            // 1. Create the database entity
+            var dbMessage = new authproject.Models.Message
+            {
+                SenderId = connection.UserId,
+                SenderFullName = fullName,
+                SenderEmail = email,
+                Content = message,
+                SentAt = DateTime.UtcNow
+            };
+
+            // 2. Save it to SQL Server
+            _dbContext.Messages.Add(dbMessage);
+            await _dbContext.SaveChangesAsync();
 
             // Broadcast to ALL connected clients
             await Clients.All.SendAsync("ReceiveMessage", fullName, email, message);

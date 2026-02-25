@@ -10,7 +10,7 @@ namespace authproject.Models
         public int Id { get; set; }
 
         [Required]
-        public int SenderId { get; set; }
+        public string SenderId { get; set; } = string.Empty;
 
         [Required]
         public string SenderFullName { get; set; } = string.Empty;
@@ -24,7 +24,7 @@ namespace authproject.Models
 
         public DateTime SentAt { get; set; } = DateTime.UtcNow;
 
-        // Optional: If you want to link it directly to your User model
+        //to link the user model to the message table ( 1 to many )
         [ForeignKey("SenderId")]
         public User? User { get; set; }
     }

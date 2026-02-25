@@ -177,9 +177,51 @@ function setupSignalREvents() {
         connection.invoke("GetOnlineUsers").catch(err => console.error(err));
     });
 
+    connection.on("LoadChatHistory", (messages) => {
+        if (!messages) return;
+
+        // We want to clear any existing messages just in case
+        // so we don't get duplicates if they reconnect
+        messagesList.innerHTML = "";
+
+        messages.forEach(msg => {
+            const isSentByMe = (msg.fullName === currentUserName || msg.email === currentUserEmail);
+
+            const rowDiv = document.createElement("div");
+            rowDiv.className = `message-row ${isSentByMe ? 'sent' : 'received'}`;
+
+            const bubbleDiv = document.createElement("div");
+            bubbleDiv.className = "message-bubble";
+
+            if (!isSentByMe) {
+                const senderDiv = document.createElement("div");
+                senderDiv.className = "message-sender-name";
+                senderDiv.textContent = msg.fullName;
+                senderDiv.style.color = stringToColor(msg.fullName);
+                bubbleDiv.appendChild(senderDiv);
+            }
+
+            const textDiv = document.createElement("div");
+            textDiv.className = "message-text";
+            textDiv.textContent = msg.content;
+            bubbleDiv.appendChild(textDiv);
+
+            rowDiv.appendChild(bubbleDiv);
+            messagesList.appendChild(rowDiv);
+        });
+
+        scrollToBottom();
+    });
+
     connection.on("onlineuserslist", function (users) {
         if (!onlineUsersList) return;
         onlineUsersList.innerHTML = "";
+
+        if (!users) {
+            onlineCount.textContent = "0";
+            return;
+        }
+
         onlineCount.textContent = users.length;
 
         users.forEach(user => {

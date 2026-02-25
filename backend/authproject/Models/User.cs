@@ -6,7 +6,7 @@ namespace authproject.Models
     public class User
     {
         [Key]
-        public int Id { get; set; }
+        public string Id { get; set; } = Guid.NewGuid().ToString();
 
         [Required]
         public string FullName { get; set; } = string.Empty;
