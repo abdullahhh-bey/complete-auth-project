@@ -11,6 +11,7 @@ namespace authproject.Data
 
         // I will be having "consumers" as table for model "Users" in DB
         public DbSet<User> Consumers { get; set; } = null!;
+        public DbSet<Message> Messages { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
