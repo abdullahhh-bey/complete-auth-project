@@ -98,7 +98,7 @@ export const RegisterPage: React.FC = () => {
                     error={errors.fullName?.message}
                     {...register('fullName')}
                 />
-
+                
                 <Input
                     label="Email"
                     placeholder="name@example.com"
