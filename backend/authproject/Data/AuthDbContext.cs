@@ -22,7 +22,15 @@ namespace authproject.Data
                 entity.ToTable("Consumers");
             });
 
+            modelBuilder.Entity<Message>(entity =>
+            {
+                entity.HasKey(u => u.Id);
+                entity.ToTable("Messages");
+            });
+
             base.OnModelCreating(modelBuilder);
         }
+
+        
     }
 }
