@@ -32,9 +32,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", builder =>
     {
-        builder.AllowAnyOrigin()
+        builder.WithOrigins("http://localhost:5173") // Allow the React Vite dev server
                .AllowAnyMethod()
-               .AllowAnyHeader();
+               .AllowAnyHeader()
+               .AllowCredentials(); // Required for SignalR WebSocket connections
     });
 });
 
@@ -99,7 +100,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// Temporarily disabling HTTPS redirection for local dev to avoid CORS preflight failures on redirect
+// app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
