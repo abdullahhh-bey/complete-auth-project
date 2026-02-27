@@ -91,8 +91,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 var app = builder.Build();
 
-app.UseCors("AllowAll");
-
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -103,6 +101,10 @@ if (app.Environment.IsDevelopment())
 // Temporarily disabling HTTPS redirection for local dev to avoid CORS preflight failures on redirect
 // app.UseHttpsRedirection();
 
+app.UseRouting();
+app.UseCors("AllowAll");
+
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
