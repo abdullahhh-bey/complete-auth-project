@@ -49,8 +49,8 @@ export const LoginPage: React.FC = () => {
             login(response.token, { id: 'unknown', email: data.email, name: 'User' }); // using placeholder info since it's not sent, can decode token later
             toast.success('Welcome back!');
 
-            // Redirect to backend chat interface across the port
-            window.location.href = 'http://localhost:5034/index.html';
+            // React components will now render the ChatPage intrinsically on the root route.
+            navigate('/');
         } catch (error: any) {
             toast.error(error.message || 'Login failed');
         }
