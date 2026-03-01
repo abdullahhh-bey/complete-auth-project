@@ -98,8 +98,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Temporarily disabling HTTPS redirection for local dev to avoid CORS preflight failures on redirect
-// app.UseHttpsRedirection();
+//Temporarily disabling HTTPS redirection for local dev to avoid CORS preflight failures on redirect
+//app.UseHttpsRedirection();
 
 app.UseRouting();
 app.UseCors("AllowAll");
