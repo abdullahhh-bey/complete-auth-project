@@ -13,6 +13,8 @@ interface ChatMessage {
     email: string;
     content: string;
     sentAt: string; // ISO string
+    receiverId?: string | null;
+    senderId?: string | null;
     isSystem?: boolean;
 }
 
@@ -54,6 +56,9 @@ export const ChatPage: React.FC = () => {
     const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
     const [status, setStatus] = useState<'Connecting...' | 'Online' | 'Reconnecting...' | 'Disconnected'>('Connecting...');
 
+    // null = Global Chat. Otherwise, it holds the userId of the person we are chatting with.
+    const [activeChatId, setActiveChatId] = useState<string | null>(null);
+
     const [inputValue, setInputValue] = useState('');
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -90,13 +95,15 @@ export const ChatPage: React.FC = () => {
             .build();
 
         // Setup Event Listeners
-        newConnection.on("receivemessage", (fullName: string, email: string, message: string) => {
+        newConnection.on("ReceiveMessage", (fullName: string, email: string, message: string, senderId: string, receiverId: string | null) => {
             setMessages(prev => [...prev, {
                 id: crypto.randomUUID(),
                 fullName,
                 email,
                 content: message,
-                sentAt: new Date().toISOString()
+                sentAt: new Date().toISOString(),
+                senderId,
+                receiverId
             }]);
         });
 
@@ -107,7 +114,9 @@ export const ChatPage: React.FC = () => {
                 fullName: msg.fullName,
                 email: msg.email,
                 content: msg.content,
-                sentAt: msg.sentAt
+                sentAt: msg.sentAt,
+                receiverId: msg.receiverId,
+                senderId: msg.senderId
             }));
             setMessages(formattedHistory);
         });
@@ -207,7 +216,7 @@ export const ChatPage: React.FC = () => {
         if (!message || !connection || status !== 'Online') return;
 
         try {
-            await connection.invoke("SendMessage", message);
+            await connection.invoke("SendMessage", message, activeChatId);
             setInputValue(''); // clear input
 
             // Immediately stop typing indicator
@@ -263,16 +272,40 @@ export const ChatPage: React.FC = () => {
                     </div>
                 </div>
                 <div className={styles.sidebarListHeader}>
+                    <h3>Channels</h3>
+                </div>
+                <ul className={styles.userList}>
+                    <li
+                        onClick={() => setActiveChatId(null)}
+                        style={{ backgroundColor: activeChatId === null ? 'var(--color-muted)' : 'transparent' }}
+                    >
+                        <div className={styles.userAvatar} style={{ backgroundColor: 'var(--color-primary)' }}>
+                            <Users size={20} />
+                        </div>
+                        <div className={styles.userInfo}>
+                            <div className={styles.userName}>Global Chat</div>
+                            <div className={styles.userStatus}>Public</div>
+                        </div>
+                    </li>
+                </ul>
+
+                <div className={styles.sidebarListHeader}>
                     <h3>Online Members ({onlineUsers.length})</h3>
                 </div>
                 <ul className={styles.userList}>
                     {onlineUsers.map(u => (
-                        <li key={u.userId}>
+                        <li
+                            key={u.userId}
+                            onClick={() => setActiveChatId(u.userId)}
+                            style={{ backgroundColor: activeChatId === u.userId ? 'var(--color-muted)' : 'transparent' }}
+                        >
                             <div className={styles.userAvatar} style={{ backgroundColor: stringToColor(u.fullName) }}>
                                 {getInitials(u.fullName)}
                             </div>
                             <div className={styles.userInfo}>
-                                <div className={styles.userName}>{u.fullName}</div>
+                                <div className={styles.userName}>
+                                    {u.fullName} {user?.id === u.userId && "(You)"}
+                                </div>
                                 <div className={styles.userStatus}>online</div>
                             </div>
                         </li>
@@ -285,10 +318,14 @@ export const ChatPage: React.FC = () => {
                 <header className={styles.chatHeader}>
                     <div className={styles.headerLeft}>
                         <div className={styles.chatAvatarIcon}>
-                            <Users size={24} />
+                            {activeChatId === null ? <Users size={24} /> : <UserCircle2 size={24} />}
                         </div>
                         <div className={styles.chatInfo}>
-                            <h2>Global Chat</h2>
+                            <h2>
+                                {activeChatId === null
+                                    ? "Global Chat"
+                                    : onlineUsers.find(u => u.userId === activeChatId)?.fullName || "Private Chat"}
+                            </h2>
                             <span className={`${styles.statusBadge} ${status === 'Online' ? styles.online : styles.offline}`}>
                                 {status}
                             </span>
@@ -309,7 +346,16 @@ export const ChatPage: React.FC = () => {
                 <div className={styles.messagesContainer}>
                     <div className={styles.messagesWrapper}>
                         <AnimatePresence>
-                            {messages.map((msg) => {
+                            {messages.filter(msg => {
+                                // Filtering logic:
+                                // If viewing Global: show only messages where receiverId is null
+                                if (activeChatId === null) {
+                                    return msg.receiverId == null;
+                                }
+                                // If viewing Private: show messages BETWEEN current user and selected user
+                                return (msg.senderId === activeChatId && msg.receiverId === user?.id) ||
+                                    (msg.senderId === user?.id && msg.receiverId === activeChatId);
+                            }).map((msg) => {
                                 if (msg.isSystem) {
                                     return (
                                         <motion.div

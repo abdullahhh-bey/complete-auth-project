@@ -126,15 +126,20 @@ namespace authproject.Hubs
             // ─────────────────────────────────────────────────────────
 
             // Fetch the last 50 messages from the database
+            // Ensure we only load Global messages AND Private messages relevant to the current user
             var chatHistory = _dbContext.Messages
+                .Where(m => m.ReceiverId == null || m.SenderId == userId || m.ReceiverId == userId)
                 .OrderByDescending(m => m.SentAt)
                 .Take(50)
                 .OrderBy(m => m.SentAt) // Re-order them chronologically 
                 .Select(m => new {
+                    id = m.Id,
                     fullName = m.SenderFullName,
                     email = m.SenderEmail,
                     content = m.Content,
-                    sentAt = m.SentAt
+                    sentAt = m.SentAt,
+                    receiverId = m.ReceiverId,
+                    senderId = m.SenderId
                 })
                 .ToList();
 
@@ -204,10 +209,8 @@ namespace authproject.Hubs
         // ═══════════════════════════════════════════════════════════════
         // SEND MESSAGE - Called by clients to send a message
         // ═══════════════════════════════════════════════════════════════
-        public async Task SendMessage(string message)
+        public async Task SendMessage(string message, string? receiverId = null)
         {
-            // No need for 'user' parameter - we get it from authentication!
-
             var connectionId = Context.ConnectionId;
             var connection = _connectionManager.GetConnection(connectionId);
 
@@ -220,25 +223,49 @@ namespace authproject.Hubs
             // Get user info from connection
             var fullName = connection.FullName;
             var email = connection.Email;
+            var senderId = connection.UserId;
 
             // 1. Create the database entity
             var dbMessage = new authproject.Models.Message
             {
-                SenderId = connection.UserId,
+                SenderId = senderId,
                 SenderFullName = fullName,
                 SenderEmail = email,
                 Content = message,
-                SentAt = DateTime.UtcNow
+                SentAt = DateTime.UtcNow,
+                ReceiverId = receiverId
             };
 
             // 2. Save it to SQL Server
             _dbContext.Messages.Add(dbMessage);
             await _dbContext.SaveChangesAsync();
 
-            // Broadcast to ALL connected clients
-            await Clients.All.SendAsync("ReceiveMessage", fullName, email, message);
+            // 3. Broadcast Logic
+            if (string.IsNullOrEmpty(receiverId))
+            {
+                // GLOBAL MESSAGE
+                await Clients.All.SendAsync("ReceiveMessage", fullName, email, message, senderId, null);
+                Console.WriteLine($"💬 Global Message from {fullName} ({email}): {message}");
+            }
+            else
+            {
+                // PRIVATE MESSAGE
+                // Find if the receiver is currently online
+                 var onlineUsers = _connectionManager.GetAllConnectedUsers();
+                 var receiverConnection = onlineUsers.FirstOrDefault(u => u.UserId == receiverId);
 
-            Console.WriteLine($"💬 Message from {fullName} ({email}): {message}");
+                 if (receiverConnection != null)
+                 {
+                     // Send to the receiver's specific connection
+                     await Clients.Client(receiverConnection.ConnectionId).SendAsync("ReceiveMessage", fullName, email, message, senderId, receiverId);
+                 }
+
+                 // ALSO send it back to the Sender's own connection so their UI updates
+                 // (We use Client instead of Caller just to be explicit)
+                 await Clients.Client(connection.ConnectionId).SendAsync("ReceiveMessage", fullName, email, message, senderId, receiverId);
+
+                 Console.WriteLine($"🔒 Private Message from {fullName} to {receiverId}: {message}");
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════

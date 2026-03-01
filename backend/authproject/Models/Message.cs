@@ -24,6 +24,8 @@ namespace authproject.Models
 
         public DateTime SentAt { get; set; } = DateTime.UtcNow;
 
+        // Nullable ReceiverId for private messages. If null, it's a global message.
+        public string? ReceiverId { get; set; }
         //to link the user model to the message table ( 1 to many )
         [ForeignKey("SenderId")]
         public User? User { get; set; }
