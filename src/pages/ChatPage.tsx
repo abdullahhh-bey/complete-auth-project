@@ -16,6 +16,8 @@ interface ChatMessage {
     receiverId?: string | null;
     senderId?: string | null;
     isSystem?: boolean;
+    isRead?: boolean;
+    readAt?: string | null;
 }
 
 interface OnlineUser {
@@ -72,6 +74,14 @@ export const ChatPage: React.FC = () => {
         scrollToBottom();
     }, [messages, typingUsers]);
 
+    // --- Read Receipts Logic ---
+    useEffect(() => {
+        if (!connection || status !== 'Online' || !activeChatId) return;
+
+        // When we switch to a chat room, tell the server we've read everything from them
+        connection.invoke("MarkMessagesAsRead", activeChatId).catch(console.error);
+    }, [activeChatId, connection, status]);
+
     // --- SignalR Setup ---
     useEffect(() => {
         const token = Cookies.get('authToken') || localStorage.getItem('authToken');
@@ -105,6 +115,11 @@ export const ChatPage: React.FC = () => {
                 senderId,
                 receiverId
             }]);
+
+            // If we are actively looking at the chat where this message came from, mark it read!
+            if (activeChatId && senderId === activeChatId) {
+                newConnection.invoke("MarkMessagesAsRead", activeChatId).catch(console.error);
+            }
         });
 
         newConnection.on("LoadChatHistory", (history: any[]) => {
@@ -116,9 +131,22 @@ export const ChatPage: React.FC = () => {
                 content: msg.content,
                 sentAt: msg.sentAt,
                 receiverId: msg.receiverId,
-                senderId: msg.senderId
+                senderId: msg.senderId,
+                isRead: msg.isRead,
+                readAt: msg.readAt
             }));
             setMessages(formattedHistory);
+        });
+
+        // Listen for when someone reads OUR messages
+        newConnection.on("MessagesRead", (readerId: string) => {
+            setMessages(prev => prev.map(msg => {
+                // If we sent it (user.id) and they read it (readerId)
+                if (msg.senderId === user?.id && msg.receiverId === readerId && !msg.isRead) {
+                    return { ...msg, isRead: true, readAt: new Date().toISOString() };
+                }
+                return msg;
+            }));
         });
 
         newConnection.on("userconnected", (fullName: string) => {
@@ -389,6 +417,11 @@ export const ChatPage: React.FC = () => {
                                             </div>
                                             <div className={styles.messageTime}>
                                                 {new Date(msg.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {isSentByMe && msg.receiverId && (
+                                                    <span className={styles.readReceipt} style={{ marginLeft: '4px', fontSize: '10px' }}>
+                                                        {msg.isRead ? <span style={{ color: '#4CAF50' }}>✓✓</span> : <span style={{ color: 'rgba(255,255,255,0.5)' }}>✓</span>}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </motion.div>

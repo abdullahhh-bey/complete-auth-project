@@ -22,9 +22,7 @@ namespace authproject.Hubs
             _dbContext = dbContext;
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // ON CONNECTED - Called automatically when user connects
-        // ═══════════════════════════════════════════════════════════════
+
         public override async Task OnConnectedAsync()
         {
             // ─────────────────────────────────────────────────────────
@@ -139,7 +137,9 @@ namespace authproject.Hubs
                     content = m.Content,
                     sentAt = m.SentAt,
                     receiverId = m.ReceiverId,
-                    senderId = m.SenderId
+                    senderId = m.SenderId,
+                    isRead = m.IsRead,
+                    readAt = m.ReadAt
                 })
                 .ToList();
 
@@ -265,6 +265,48 @@ namespace authproject.Hubs
                  await Clients.Client(connection.ConnectionId).SendAsync("ReceiveMessage", fullName, email, message, senderId, receiverId);
 
                  Console.WriteLine($"🔒 Private Message from {fullName} to {receiverId}: {message}");
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // MARK TARGET MESSAGES AS READ
+        // ═══════════════════════════════════════════════════════════════
+        public async Task MarkMessagesAsRead(string senderId)
+        {
+            var connectionId = Context.ConnectionId;
+            var connection = _connectionManager.GetConnection(connectionId);
+
+            if (connection == null) return;
+
+            var currentUserId = connection.UserId;
+
+            // Find all unread messages where:
+            // - The sender is `senderId`
+            // - The receiver is the current user (`currentUserId`)
+            var unreadMessages = _dbContext.Messages
+                .Where(m => m.SenderId == senderId && m.ReceiverId == currentUserId && !m.IsRead)
+                .ToList();
+
+            if (unreadMessages.Any())
+            {
+                var now = DateTime.UtcNow;
+                foreach (var msg in unreadMessages)
+                {
+                    msg.IsRead = true;
+                    msg.ReadAt = now;
+                }
+
+                await _dbContext.SaveChangesAsync();
+
+                // Alert the original sender that their messages were read
+                var onlineUsers = _connectionManager.GetAllConnectedUsers();
+                var originalSenderConnection = onlineUsers.FirstOrDefault(u => u.UserId == senderId);
+
+                if (originalSenderConnection != null)
+                {
+                    // Blast back to the sender
+                    await Clients.Client(originalSenderConnection.ConnectionId).SendAsync("MessagesRead", currentUserId);
+                }
             }
         }
 

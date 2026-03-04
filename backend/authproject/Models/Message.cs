@@ -16,7 +16,7 @@ namespace authproject.Models
         public string SenderFullName { get; set; } = string.Empty;
 
         [Required]
-        [EmailAddress(ErrorMessage = "Email should be valid.")]
+        [EmailAddress(ErrorMessage = "Email shold be valid.")]
         public string SenderEmail { get; set; } = string.Empty;
 
         [Required]
@@ -26,6 +26,10 @@ namespace authproject.Models
 
         // Nullable ReceiverId for private messages. If null, it's a global message.
         public string? ReceiverId { get; set; }
+
+        // Read receipt tracking
+        public bool IsRead { get; set; } = false;
+        public DateTime? ReadAt { get; set; }
         //to link the user model to the message table ( 1 to many )
         [ForeignKey("SenderId")]
         public User? User { get; set; }
