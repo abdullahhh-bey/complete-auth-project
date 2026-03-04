@@ -60,6 +60,17 @@ export const ChatPage: React.FC = () => {
 
     // null = Global Chat. Otherwise, it holds the userId of the person we are chatting with.
     const [activeChatId, setActiveChatId] = useState<string | null>(null);
+    const activeChatIdRef = useRef<string | null>(null);
+
+    const userRef = useRef(user);
+
+    useEffect(() => {
+        activeChatIdRef.current = activeChatId;
+    }, [activeChatId]);
+
+    useEffect(() => {
+        userRef.current = user;
+    }, [user]);
 
     const [inputValue, setInputValue] = useState('');
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -117,8 +128,8 @@ export const ChatPage: React.FC = () => {
             }]);
 
             // If we are actively looking at the chat where this message came from, mark it read!
-            if (activeChatId && senderId === activeChatId) {
-                newConnection.invoke("MarkMessagesAsRead", activeChatId).catch(console.error);
+            if (activeChatIdRef.current && senderId === activeChatIdRef.current) {
+                newConnection.invoke("MarkMessagesAsRead", activeChatIdRef.current).catch(console.error);
             }
         });
 
@@ -142,7 +153,7 @@ export const ChatPage: React.FC = () => {
         newConnection.on("MessagesRead", (readerId: string) => {
             setMessages(prev => prev.map(msg => {
                 // If we sent it (user.id) and they read it (readerId)
-                if (msg.senderId === user?.id && msg.receiverId === readerId && !msg.isRead) {
+                if (msg.senderId === userRef.current?.id && msg.receiverId === readerId && !msg.isRead) {
                     return { ...msg, isRead: true, readAt: new Date().toISOString() };
                 }
                 return msg;
