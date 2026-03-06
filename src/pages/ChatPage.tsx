@@ -27,6 +27,12 @@ interface OnlineUser {
     connectedAt: string;
 }
 
+interface DirectoryUser {
+    id: string;
+    fullName: string;
+    email: string;
+}
+
 // --- Helper Functions ---
 const stringToColor = (str: string) => {
     let hash = 0;
@@ -55,6 +61,7 @@ export const ChatPage: React.FC = () => {
     const [connection, setConnection] = useState<HubConnection | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
+    const [allUsers, setAllUsers] = useState<DirectoryUser[]>([]);
     const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
     const [status, setStatus] = useState<'Connecting...' | 'Online' | 'Reconnecting...' | 'Disconnected'>('Connecting...');
 
@@ -102,6 +109,21 @@ export const ChatPage: React.FC = () => {
             setStatus('Disconnected');
             return;
         }
+
+        // Fetch All Users Directory
+        const fetchAllUsers = async () => {
+            try {
+                const res = await fetch('http://localhost:5034/api/auth');
+                if (res.ok) {
+                    const data = await res.json();
+                    setAllUsers(data);
+                }
+            } catch (err) {
+                console.error("Failed to fetch user directory:", err);
+            }
+        };
+
+        fetchAllUsers();
 
         // Initialize Connection
         const newConnection = new HubConnectionBuilder()
@@ -329,26 +351,44 @@ export const ChatPage: React.FC = () => {
                 </ul>
 
                 <div className={styles.sidebarListHeader}>
-                    <h3>Online Members ({onlineUsers.length})</h3>
+                    <h3>Direct Messages</h3>
                 </div>
                 <ul className={styles.userList}>
-                    {onlineUsers.map(u => (
-                        <li
-                            key={u.userId}
-                            onClick={() => setActiveChatId(u.userId)}
-                            style={{ backgroundColor: activeChatId === u.userId ? 'var(--color-muted)' : 'transparent' }}
-                        >
-                            <div className={styles.userAvatar} style={{ backgroundColor: stringToColor(u.fullName) }}>
-                                {getInitials(u.fullName)}
-                            </div>
-                            <div className={styles.userInfo}>
-                                <div className={styles.userName}>
-                                    {u.fullName} {user?.id === u.userId && "(You)"}
+                    {allUsers.filter(u => u.id !== user?.id).map(u => {
+                        const isOnline = onlineUsers.some(ou => ou.userId === u.id);
+
+                        return (
+                            <li
+                                key={u.id}
+                                onClick={() => setActiveChatId(u.id)}
+                                style={{ backgroundColor: activeChatId === u.id ? 'var(--color-muted)' : 'transparent' }}
+                            >
+                                <div className={styles.userAvatar} style={{ backgroundColor: stringToColor(u.fullName), position: 'relative' }}>
+                                    {getInitials(u.fullName)}
+                                    {isOnline && (
+                                        <span style={{
+                                            position: 'absolute',
+                                            bottom: 0,
+                                            right: 0,
+                                            width: '10px',
+                                            height: '10px',
+                                            backgroundColor: '#4CAF50',
+                                            borderRadius: '50%',
+                                            border: '2px solid var(--color-background)'
+                                        }}></span>
+                                    )}
                                 </div>
-                                <div className={styles.userStatus}>online</div>
-                            </div>
-                        </li>
-                    ))}
+                                <div className={styles.userInfo}>
+                                    <div className={styles.userName}>
+                                        {u.fullName}
+                                    </div>
+                                    <div className={styles.userStatus} style={{ color: isOnline ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
+                                        {isOnline ? 'online' : 'offline'}
+                                    </div>
+                                </div>
+                            </li>
+                        );
+                    })}
                 </ul>
             </aside>
 
@@ -363,7 +403,7 @@ export const ChatPage: React.FC = () => {
                             <h2>
                                 {activeChatId === null
                                     ? "Global Chat"
-                                    : onlineUsers.find(u => u.userId === activeChatId)?.fullName || "Private Chat"}
+                                    : allUsers.find(u => u.id === activeChatId)?.fullName || "Private Chat"}
                             </h2>
                             <span className={`${styles.statusBadge} ${status === 'Online' ? styles.online : styles.offline}`}>
                                 {status}

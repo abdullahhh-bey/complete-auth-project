@@ -26,8 +26,16 @@ namespace authproject.Controllers
        [HttpGet]
        public IActionResult GetUsers()
        {
-            var users = _context.Consumers.ToList();
-            if ( users.Count == 0)
+            var users = _context.Consumers
+                .Select(u => new 
+                {
+                    id = u.Id,
+                    fullName = u.FullName,
+                    email = u.Email
+                })
+                .ToList();
+
+            if (users.Count == 0)
             {
                 return NotFound("No users yet");
             }
