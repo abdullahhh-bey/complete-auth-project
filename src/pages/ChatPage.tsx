@@ -73,6 +73,7 @@ export const ChatPage: React.FC = () => {
 
     useEffect(() => {
         activeChatIdRef.current = activeChatId;
+        setTypingUsers(new Set()); // Reset typing dots when switching rooms
     }, [activeChatId]);
 
     useEffect(() => {
@@ -210,7 +211,11 @@ export const ChatPage: React.FC = () => {
             setOnlineUsers(users || []);
         });
 
-        newConnection.on("usertyping", (fullName: string) => {
+        newConnection.on("usertyping", (fullName: string, senderId: string, receiverId: string | null) => {
+            // Only show the indicator if the context matches what the user is currently looking at
+            if (receiverId === null && activeChatIdRef.current !== null) return; // Typing globally, but we are in private
+            if (receiverId !== null && activeChatIdRef.current !== senderId) return; // Typing privately, but to someone else or we're global
+
             setTypingUsers(prev => {
                 const next = new Set(prev);
                 next.add(fullName);
@@ -218,7 +223,7 @@ export const ChatPage: React.FC = () => {
             });
         });
 
-        newConnection.on("userstoppedtyping", (fullName: string) => {
+        newConnection.on("userstoppedtyping", (fullName: string, senderId: string, receiverId: string | null) => {
             setTypingUsers(prev => {
                 const next = new Set(prev);
                 next.delete(fullName);
@@ -281,7 +286,7 @@ export const ChatPage: React.FC = () => {
             setInputValue(''); // clear input
 
             // Immediately stop typing indicator
-            await connection.invoke("StopTypingIndicator");
+            await connection.invoke("StopTypingIndicator", activeChatIdRef.current);
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
         } catch (err) {
@@ -299,13 +304,13 @@ export const ChatPage: React.FC = () => {
         }
 
         if (e.target.value.trim() !== "") {
-            connection.invoke("SendTypingIndicator").catch(console.error);
+            connection.invoke("SendTypingIndicator", activeChatIdRef.current).catch(console.error);
 
             typingTimeoutRef.current = setTimeout(() => {
-                connection.invoke("StopTypingIndicator").catch(console.error);
+                connection.invoke("StopTypingIndicator", activeChatIdRef.current).catch(console.error);
             }, 2000);
         } else {
-            connection.invoke("StopTypingIndicator").catch(console.error);
+            connection.invoke("StopTypingIndicator", activeChatIdRef.current).catch(console.error);
         }
     };
 

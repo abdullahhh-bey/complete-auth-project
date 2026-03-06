@@ -333,24 +333,47 @@ namespace authproject.Hubs
         // TYPING INDICATORS
         // ═══════════════════════════════════════════════════════════════
 
-        public async Task SendTypingIndicator()
+        public async Task SendTypingIndicator(string? receiverId = null)
         {
             var connection = _connectionManager.GetConnection(Context.ConnectionId);
+            if (connection == null) return;
 
-            if (connection != null)
+            if (string.IsNullOrEmpty(receiverId))
             {
-                // Send to everyone EXCEPT the person typing
-                await Clients.Others.SendAsync("UserTyping", connection.FullName);
+                // Global Typing
+                await Clients.Others.SendAsync("UserTyping", connection.FullName, connection.UserId, null);
+            }
+            else
+            {
+                // Private Typing
+                var onlineUsers = _connectionManager.GetAllConnectedUsers();
+                var receiverConnection = onlineUsers.FirstOrDefault(u => u.UserId == receiverId);
+                if (receiverConnection != null)
+                {
+                    await Clients.Client(receiverConnection.ConnectionId).SendAsync("UserTyping", connection.FullName, connection.UserId, receiverId);
+                }
             }
         }
 
-        public async Task StopTypingIndicator()
+        public async Task StopTypingIndicator(string? receiverId = null)
         {
             var connection = _connectionManager.GetConnection(Context.ConnectionId);
+            if (connection == null) return;
 
-            if (connection != null)
+            if (string.IsNullOrEmpty(receiverId))
             {
-                await Clients.Others.SendAsync("UserStoppedTyping", connection.FullName);
+                // Global Typing Stop
+                await Clients.Others.SendAsync("UserStoppedTyping", connection.FullName, connection.UserId, null);
+            }
+            else
+            {
+                // Private Typing Stop
+                var onlineUsers = _connectionManager.GetAllConnectedUsers();
+                var receiverConnection = onlineUsers.FirstOrDefault(u => u.UserId == receiverId);
+                if (receiverConnection != null)
+                {
+                    await Clients.Client(receiverConnection.ConnectionId).SendAsync("UserStoppedTyping", connection.FullName, connection.UserId, receiverId);
+                }
             }
         }
     }
