@@ -53,8 +53,11 @@ namespace authproject.Controllers
                     CreatedAt = c.CreatedAt,
                     // If it's a private chat, get the name of the *other* person.
                     // If it's a group chat, use the Group Name.
-                    DisplayName = c.Type == 1 
-                        ? (c.Participants.FirstOrDefault(p => p.UserId != userId)?.User?.FullName ?? "Unknown User")
+                    DisplayName = c.Type == 1
+                        ? (c.Participants
+                            .Where(p => p.UserId != userId)
+                            .Select(p => p.User.FullName)
+                            .FirstOrDefault() ?? "Unknown User")
                         : c.Name,
                     Participants = c.Participants.Select(p => new
                     {

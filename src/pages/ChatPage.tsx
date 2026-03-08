@@ -154,10 +154,10 @@ export const ChatPage: React.FC = () => {
                 content: message,
                 sentAt: new Date().toISOString(),
                 senderId,
-                chatId
+                chatId: chatId ?? null
             }]);
 
-            if (activeChatIdRef.current && chatId === activeChatIdRef.current) {
+            if (activeChatIdRef.current && (chatId ?? null) === activeChatIdRef.current) {
                 newConnection.invoke("MarkMessagesAsRead", activeChatIdRef.current).catch(console.error);
             }
         });
@@ -170,17 +170,17 @@ export const ChatPage: React.FC = () => {
                 email: msg.email,
                 content: msg.content,
                 sentAt: msg.sentAt,
-                chatId: msg.chatId,
+                chatId: msg.chatId ?? null,
                 senderId: msg.senderId,
-                isRead: msg.isRead,
-                readAt: msg.readAt
+                isRead: msg.isRead ?? false,
+                readAt: msg.readAt ?? null
             }));
             setMessages(formattedHistory);
         });
 
         newConnection.on("MessagesRead", (_readerId: string, chatId: string) => {
             setMessages(prev => prev.map(msg => {
-                if (msg.senderId === userRef.current?.id && msg.chatId === chatId && !msg.isRead) {
+                if (msg.senderId === userRef.current?.id && (msg.chatId ?? null) === (chatId ?? null) && !msg.isRead) {
                     return { ...msg, isRead: true, readAt: new Date().toISOString() };
                 }
                 return msg;
@@ -489,7 +489,7 @@ export const ChatPage: React.FC = () => {
                 <div className={styles.messagesContainer}>
                     <div className={styles.messagesWrapper}>
                         <AnimatePresence>
-                            {messages.filter(msg => msg.chatId === activeChatId).map((msg) => {
+                            {messages.filter(msg => (msg.chatId ?? null) === (activeChatId ?? null)).map((msg) => {
                                 if (msg.isSystem) {
                                     return (
                                         <motion.div key={msg.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className={styles.systemMessage}>
