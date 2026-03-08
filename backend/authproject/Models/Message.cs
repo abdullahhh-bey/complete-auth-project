@@ -24,8 +24,11 @@ namespace authproject.Models
 
         public DateTime SentAt { get; set; } = DateTime.UtcNow;
 
-        // Nullable ReceiverId for private messages. If null, it's a global message.
-        public string? ReceiverId { get; set; }
+        // Link to the unified Chat model (Nullable for Global Chat)
+        public string? ChatId { get; set; }
+
+        [ForeignKey("ChatId")]
+        public Chat? Chat { get; set; }
 
         // Read receipt tracking
         public bool IsRead { get; set; } = false;
