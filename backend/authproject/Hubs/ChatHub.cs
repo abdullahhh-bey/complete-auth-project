@@ -124,9 +124,9 @@ namespace authproject.Hubs
             // ─────────────────────────────────────────────────────────
 
             // Fetch the last 50 messages from the database
-            // Ensure we only load Global messages AND Private messages relevant to the current user
+            // Ensure we only load Global messages (ChatId == null) AND Chats relevant to the current user
             var chatHistory = _dbContext.Messages
-                .Where(m => m.ReceiverId == null || m.SenderId == userId || m.ReceiverId == userId)
+                .Where(m => m.ChatId == null || _dbContext.ChatParticipants.Any(cp => cp.ChatId == m.ChatId && cp.UserId == userId))
                 .OrderByDescending(m => m.SentAt)
                 .Take(50)
                 .OrderBy(m => m.SentAt) // Re-order them chronologically 
@@ -136,7 +136,7 @@ namespace authproject.Hubs
                     email = m.SenderEmail,
                     content = m.Content,
                     sentAt = m.SentAt,
-                    receiverId = m.ReceiverId,
+                    chatId = m.ChatId,
                     senderId = m.SenderId,
                     isRead = m.IsRead,
                     readAt = m.ReadAt
@@ -209,7 +209,7 @@ namespace authproject.Hubs
         // ═══════════════════════════════════════════════════════════════
         // SEND MESSAGE - Called by clients to send a message
         // ═══════════════════════════════════════════════════════════════
-        public async Task SendMessage(string message, string? receiverId = null)
+        public async Task SendMessage(string message, string? chatId = null)
         {
             var connectionId = Context.ConnectionId;
             var connection = _connectionManager.GetConnection(connectionId);
@@ -233,7 +233,7 @@ namespace authproject.Hubs
                 SenderEmail = email,
                 Content = message,
                 SentAt = DateTime.UtcNow,
-                ReceiverId = receiverId
+                ChatId = chatId
             };
 
             // 2. Save it to SQL Server
@@ -241,7 +241,7 @@ namespace authproject.Hubs
             await _dbContext.SaveChangesAsync();
 
             // 3. Broadcast Logic
-            if (string.IsNullOrEmpty(receiverId))
+            if (string.IsNullOrEmpty(chatId))
             {
                 // GLOBAL MESSAGE
                 await Clients.All.SendAsync("ReceiveMessage", fullName, email, message, senderId, null);
@@ -249,29 +249,31 @@ namespace authproject.Hubs
             }
             else
             {
-                // PRIVATE MESSAGE
-                // Find if the receiver is currently online
-                 var onlineUsers = _connectionManager.GetAllConnectedUsers();
-                 var receiverConnection = onlineUsers.FirstOrDefault(u => u.UserId == receiverId);
+                // PRIVATE / GROUP MESSAGE
+                // Find all participants of this specific chat
+                var participants = _dbContext.ChatParticipants
+                                             .Where(cp => cp.ChatId == chatId)
+                                             .Select(cp => cp.UserId)
+                                             .ToList();
 
-                 if (receiverConnection != null)
-                 {
-                     // Send to the receiver's specific connection
-                     await Clients.Client(receiverConnection.ConnectionId).SendAsync("ReceiveMessage", fullName, email, message, senderId, receiverId);
-                 }
+                var onlineUsers = _connectionManager.GetAllConnectedUsers();
+                foreach (var participantId in participants)
+                {
+                    var receiverConnection = onlineUsers.FirstOrDefault(u => u.UserId == participantId);
+                    if (receiverConnection != null)
+                    {
+                        await Clients.Client(receiverConnection.ConnectionId).SendAsync("ReceiveMessage", fullName, email, message, senderId, chatId);
+                    }
+                }
 
-                 // ALSO send it back to the Sender's own connection so their UI updates
-                 // (We use Client instead of Caller just to be explicit)
-                 await Clients.Client(connection.ConnectionId).SendAsync("ReceiveMessage", fullName, email, message, senderId, receiverId);
-
-                 Console.WriteLine($"🔒 Private Message from {fullName} to {receiverId}: {message}");
+                Console.WriteLine($"🔒 Group/Private Message from {fullName} to Chat {chatId}: {message}");
             }
         }
 
         // ═══════════════════════════════════════════════════════════════
         // MARK TARGET MESSAGES AS READ
         // ═══════════════════════════════════════════════════════════════
-        public async Task MarkMessagesAsRead(string senderId)
+        public async Task MarkMessagesAsRead(string chatId)
         {
             var connectionId = Context.ConnectionId;
             var connection = _connectionManager.GetConnection(connectionId);
@@ -281,10 +283,11 @@ namespace authproject.Hubs
             var currentUserId = connection.UserId;
 
             // Find all unread messages where:
-            // - The sender is `senderId`
-            // - The receiver is the current user (`currentUserId`)
+            // - The message belongs to this `chatId`
+            // - The receiver is the current user (`currentUserId`) implicitly because they are fetching read receipts
+            // - The sender is NOT the current user
             var unreadMessages = _dbContext.Messages
-                .Where(m => m.SenderId == senderId && m.ReceiverId == currentUserId && !m.IsRead)
+                .Where(m => m.ChatId == chatId && m.SenderId != currentUserId && !m.IsRead)
                 .ToList();
 
             if (unreadMessages.Any())
@@ -298,14 +301,18 @@ namespace authproject.Hubs
 
                 await _dbContext.SaveChangesAsync();
 
-                // Alert the original sender that their messages were read
+                // Alert the original senders that their messages were read
+                var senders = unreadMessages.Select(m => m.SenderId).Distinct();
                 var onlineUsers = _connectionManager.GetAllConnectedUsers();
-                var originalSenderConnection = onlineUsers.FirstOrDefault(u => u.UserId == senderId);
 
-                if (originalSenderConnection != null)
+                foreach (var senderId in senders)
                 {
-                    // Blast back to the sender
-                    await Clients.Client(originalSenderConnection.ConnectionId).SendAsync("MessagesRead", currentUserId);
+                    var originalSenderConnection = onlineUsers.FirstOrDefault(u => u.UserId == senderId);
+                    if (originalSenderConnection != null)
+                    {
+                        // Blast back to the senders
+                        await Clients.Client(originalSenderConnection.ConnectionId).SendAsync("MessagesRead", currentUserId, chatId);
+                    }
                 }
             }
         }
