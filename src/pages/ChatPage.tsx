@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import Cookies from 'js-cookie';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../api/auth';
 import styles from './ChatPage.module.css';
 import { Send, Users, UserCircle2, LogOut, Paperclip, Smile, Plus, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -112,7 +113,7 @@ export const ChatPage: React.FC = () => {
 
     const fetchChats = async (token: string) => {
         try {
-            const res = await fetch('http://localhost:5034/api/chat', {
+            const res = await fetch(`${API_BASE_URL}/chat`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) setChats(await res.json());
@@ -130,7 +131,7 @@ export const ChatPage: React.FC = () => {
 
         const fetchAllUsers = async () => {
             try {
-                const res = await fetch('http://localhost:5034/api/auth');
+                const res = await fetch(`${API_BASE_URL}/auth`);
                 if (res.ok) setAllUsers(await res.json());
             } catch (err) {
                 console.error("Failed to fetch user directory:", err);
@@ -141,7 +142,7 @@ export const ChatPage: React.FC = () => {
         fetchChats(token);
 
         const newConnection = new HubConnectionBuilder()
-            .withUrl("http://localhost:5034/chathub", { accessTokenFactory: () => token })
+            .withUrl(`${API_BASE_URL.replace('/api', '')}/chathub`, { accessTokenFactory: () => token })
             .configureLogging(LogLevel.Information)
             .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
             .build();
@@ -289,7 +290,7 @@ export const ChatPage: React.FC = () => {
     const startPrivateChat = async (targetUserId: string) => {
         try {
             const token = Cookies.get('authToken') || localStorage.getItem('authToken');
-            const res = await fetch('http://localhost:5034/api/chat/private', {
+            const res = await fetch(`${API_BASE_URL}/chat/private`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ targetUserId })
@@ -306,7 +307,7 @@ export const ChatPage: React.FC = () => {
         if (!newGroupName.trim() || selectedGroupUsers.size === 0) return;
         try {
             const token = Cookies.get('authToken') || localStorage.getItem('authToken');
-            const res = await fetch('http://localhost:5034/api/chat/group', {
+            const res = await fetch(`${API_BASE_URL}/chat/group`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ name: newGroupName, userIds: Array.from(selectedGroupUsers) })
