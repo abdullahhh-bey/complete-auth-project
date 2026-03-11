@@ -119,4 +119,6 @@ app.UseDefaultFiles();
 // The route "/chathub" is what clients use to connect
 app.MapHub<ChatHub>("/chathub");
 
+app.MapGet("/", () => "API is running properly!");
+
 app.Run();

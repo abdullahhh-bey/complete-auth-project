@@ -16,6 +16,6 @@ COPY --from=build /app/out .
 
 # Expose port (Render uses port 80 or 8080 by default)
 EXPOSE 8080
-ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_URLS=http://0.0.0.0:8080
 
 ENTRYPOINT ["dotnet", "authproject.dll"]
