@@ -1,4 +1,4 @@
-﻿using authproject.Application;
+using authproject.Application;
 using authproject.Application.EmailService;
 using authproject.Data;
 using authproject.Hubs;
@@ -24,8 +24,9 @@ builder.Services.AddSingleton<ConnectionManager>();
 //Adding the connction string 
 var connectionString = builder.Configuration["ConnectionStrings:DefaultConnection"];
 
+//for supabase
 builder.Services.AddDbContext<AuthDbContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseNpgsql(connectionString));
 
 builder.Services.AddCors(options =>
 {

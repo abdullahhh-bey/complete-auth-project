@@ -60,7 +60,7 @@ namespace authproject.Data
                     $"'DefaultConnection' environment variable for design-time operations.");
             }
 
-            optionsBuilder.UseSqlServer(connectionString);
+            optionsBuilder.UseNpgsql(connectionString);
 
             return new AuthDbContext(optionsBuilder.Options);
         }
