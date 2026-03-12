@@ -32,7 +32,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", builder =>
     {
-        builder.WithOrigins("http://localhost:5173") // Allow the React Vite dev server
+        builder.WithOrigins("http://localhost:5173", "https://securelocks-app.vercel.app") // Allow React Vite dev server and Vercel app
                .AllowAnyMethod()
                .AllowAnyHeader()
                .AllowCredentials(); // Required for SignalR WebSocket connections
